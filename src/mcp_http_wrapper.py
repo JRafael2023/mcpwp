@@ -70,6 +70,7 @@ async def startup():
 
 
 @app.get("/")
+@app.head("/")
 async def root():
     """Info del servidor"""
     return {
@@ -86,6 +87,7 @@ async def root():
 
 
 @app.get("/health")
+@app.head("/health")
 async def health():
     """Health check"""
     return {"status": "healthy"}
