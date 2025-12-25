@@ -890,32 +890,32 @@ class WordPressMCPServer:
             except Exception as e:
                 return [TextContent(type="text", text=json.dumps({"error": str(e)}))]
 
-    async def run(self):
-        """Inicia el servidor MCP"""
+     async def run(self):
+            """Inicia el servidor MCP"""
 
-        wp_url = os.getenv("WP_URL")
-        wp_username = os.getenv("WP_USERNAME")
-        wp_password = os.getenv("WP_PASSWORD")
+            wp_url = os.getenv("WP_URL")
+            wp_username = os.getenv("WP_USER")
+            wp_password = os.getenv("WP_APP_PASSWORD")
 
-        logger.info(
-            f"WP_URL={bool(wp_url)} "
-            f"WP_USERNAME={bool(wp_username)} "
-            f"WP_PASSWORD={bool(wp_password)}"
-        )
+            logger.info(
+                f"WP_URL={bool(wp_url)} "
+                f"WP_USER={bool(wp_username)} "
+                f"WP_APP_PASSWORD={bool(wp_password)}"
+            )
 
-        if not all([wp_url, wp_username, wp_password]):
+            if not all([wp_url, wp_username, wp_password]):
             logger.warning("⚠️ WordPress no configurado todavía. MCP iniciará sin WP.")
             self.wp = None
-        else:
+            else:
             self.wp = WordPressAPI(wp_url, wp_username, wp_password)
             logger.info("✅ WordPress API inicializado correctamente")
-
-        async with stdio_server() as (read_stream, write_stream):
+ 
+            async with stdio_server() as (read_stream, write_stream):
             await self.server.run(
-                read_stream,
-                write_stream,
-                self.server.create_initialization_options(),
-            )
+            read_stream,
+            write_stream,
+            self.server.create_initialization_options(),
+        )
 
 
 async def main():
