@@ -27,8 +27,7 @@ except ImportError:
 
 # Configurar logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -37,33 +36,41 @@ class WordPressAPI:
     """Cliente para interactuar con el REST API de WordPress"""
 
     def __init__(self, url: str, username: str, password: str):
-        self.url = url.rstrip('/')
+        self.url = url.rstrip("/")
         self.username = username
         self.password = password
 
         # Crear token de Basic Auth
         credentials = f"{username}:{password}"
-        token = b64encode(credentials.encode()).decode('ascii')
+        token = b64encode(credentials.encode()).decode("ascii")
 
         self.headers = {
-            'Authorization': f'Basic {token}',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            "Authorization": f"Basic {token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
         }
 
-    async def _request(self, method: str, endpoint: str, data: Optional[Dict] = None, params: Optional[Dict] = None) -> Any:
+    async def _request(
+        self,
+        method: str,
+        endpoint: str,
+        data: Optional[Dict] = None,
+        params: Optional[Dict] = None,
+    ) -> Any:
         """Realiza petición HTTP al API de WordPress"""
         url = f"{self.url}/wp-json{endpoint}"
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             try:
-                if method == 'GET':
-                    response = await client.get(url, headers=self.headers, params=params)
-                elif method == 'POST':
+                if method == "GET":
+                    response = await client.get(
+                        url, headers=self.headers, params=params
+                    )
+                elif method == "POST":
                     response = await client.post(url, headers=self.headers, json=data)
-                elif method == 'PUT':
+                elif method == "PUT":
                     response = await client.put(url, headers=self.headers, json=data)
-                elif method == 'DELETE':
+                elif method == "DELETE":
                     response = await client.delete(url, headers=self.headers)
 
                 response.raise_for_status()
@@ -74,65 +81,75 @@ class WordPressAPI:
     # === Categorías ===
     async def list_categories(self, per_page: int = 100) -> List[Dict]:
         """Lista todas las categorías"""
-        return await self._request('GET', '/wp/v2/categories', params={'per_page': per_page})
+        return await self._request(
+            "GET", "/wp/v2/categories", params={"per_page": per_page}
+        )
 
     # === Posts ===
-    async def list_posts(self, per_page: int = 10, page: int = 1, status: str = 'any') -> List[Dict]:
+    async def list_posts(
+        self, per_page: int = 10, page: int = 1, status: str = "any"
+    ) -> List[Dict]:
         """Lista posts"""
-        params = {'per_page': per_page, 'page': page, 'status': status}
-        return await self._request('GET', '/wp/v2/posts', params=params)
+        params = {"per_page": per_page, "page": page, "status": status}
+        return await self._request("GET", "/wp/v2/posts", params=params)
 
     async def search_posts(self, search: str, per_page: int = 10) -> List[Dict]:
         """Busca posts por término"""
-        params = {'search': search, 'per_page': per_page}
-        return await self._request('GET', '/wp/v2/posts', params=params)
+        params = {"search": search, "per_page": per_page}
+        return await self._request("GET", "/wp/v2/posts", params=params)
 
-    async def create_post(self, title: str, content: str, status: str = 'draft',
-                         categories: Optional[List[int]] = None,
-                         tags: Optional[List[int]] = None) -> Dict:
+    async def create_post(
+        self,
+        title: str,
+        content: str,
+        status: str = "draft",
+        categories: Optional[List[int]] = None,
+        tags: Optional[List[int]] = None,
+    ) -> Dict:
         """Crea un nuevo post"""
-        data = {
-            'title': title,
-            'content': content,
-            'status': status
-        }
+        data = {"title": title, "content": content, "status": status}
         if categories:
-            data['categories'] = categories
+            data["categories"] = categories
         if tags:
-            data['tags'] = tags
+            data["tags"] = tags
 
-        return await self._request('POST', '/wp/v2/posts', data=data)
+        return await self._request("POST", "/wp/v2/posts", data=data)
 
     async def update_post(self, post_id: int, **kwargs) -> Dict:
         """Actualiza un post existente"""
-        return await self._request('PUT', f'/wp/v2/posts/{post_id}', data=kwargs)
+        return await self._request("PUT", f"/wp/v2/posts/{post_id}", data=kwargs)
 
     async def delete_post(self, post_id: int, force: bool = False) -> Dict:
         """Elimina un post"""
-        params = {'force': 'true' if force else 'false'}
-        return await self._request('DELETE', f'/wp/v2/posts/{post_id}', params=params)
+        params = {"force": "true" if force else "false"}
+        return await self._request("DELETE", f"/wp/v2/posts/{post_id}", params=params)
 
     # === Media ===
-    async def upload_media(self, file_path: str, title: Optional[str] = None,
-                          alt_text: Optional[str] = None) -> Dict:
+    async def upload_media(
+        self,
+        file_path: str,
+        title: Optional[str] = None,
+        alt_text: Optional[str] = None,
+    ) -> Dict:
         """Sube un archivo multimedia"""
         file_name = os.path.basename(file_path)
 
         # Leer archivo
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             file_data = f.read()
 
         # Headers especiales para subida de archivos
         headers = {
-            'Authorization': self.headers['Authorization'],
-            'Content-Disposition': f'attachment; filename="{file_name}"',
+            "Authorization": self.headers["Authorization"],
+            "Content-Disposition": f'attachment; filename="{file_name}"',
         }
 
         # Detectar tipo MIME
         import mimetypes
+
         content_type, _ = mimetypes.guess_type(file_path)
         if content_type:
-            headers['Content-Type'] = content_type
+            headers["Content-Type"] = content_type
 
         url = f"{self.url}/wp-json/wp/v2/media"
 
@@ -145,34 +162,37 @@ class WordPressAPI:
         if title or alt_text:
             update_data = {}
             if title:
-                update_data['title'] = title
+                update_data["title"] = title
             if alt_text:
-                update_data['alt_text'] = alt_text
+                update_data["alt_text"] = alt_text
 
-            media = await self._request('PUT', f'/wp/v2/media/{media["id"]}', data=update_data)
+            media = await self._request(
+                "PUT", f'/wp/v2/media/{media["id"]}', data=update_data
+            )
 
         return media
 
     # === Tags ===
     async def list_tags(self, per_page: int = 100) -> List[Dict]:
         """Lista todas las etiquetas"""
-        return await self._request('GET', '/wp/v2/tags', params={'per_page': per_page})
+        return await self._request("GET", "/wp/v2/tags", params={"per_page": per_page})
 
     async def search_tags(self, search: str, per_page: int = 10) -> List[Dict]:
         """Busca etiquetas por término"""
-        params = {'search': search, 'per_page': per_page}
-        return await self._request('GET', '/wp/v2/tags', params=params)
+        params = {"search": search, "per_page": per_page}
+        return await self._request("GET", "/wp/v2/tags", params=params)
 
-    async def create_tag(self, name: str, description: Optional[str] = None,
-                        slug: Optional[str] = None) -> Dict:
+    async def create_tag(
+        self, name: str, description: Optional[str] = None, slug: Optional[str] = None
+    ) -> Dict:
         """Crea una nueva etiqueta"""
-        data = {'name': name}
+        data = {"name": name}
         if description:
-            data['description'] = description
+            data["description"] = description
         if slug:
-            data['slug'] = slug
+            data["slug"] = slug
 
-        return await self._request('POST', '/wp/v2/tags', data=data)
+        return await self._request("POST", "/wp/v2/tags", data=data)
 
 
 class WordPressMCPServer:
@@ -189,7 +209,9 @@ class WordPressMCPServer:
             if self.ai_generator.is_available():
                 logger.info("✅ Generador de IA inicializado correctamente")
             else:
-                logger.warning("⚠️ Generador de IA no disponible (falta ANTHROPIC_API_KEY)")
+                logger.warning(
+                    "⚠️ Generador de IA no disponible (falta ANTHROPIC_API_KEY)"
+                )
         except Exception as e:
             logger.error(f"❌ Error inicializando generador de IA: {e}")
             self.ai_generator = None
@@ -213,10 +235,10 @@ class WordPressMCPServer:
                             "per_page": {
                                 "type": "integer",
                                 "description": "Número de categorías a obtener (default: 100)",
-                                "default": 100
+                                "default": 100,
                             }
-                        }
-                    }
+                        },
+                    },
                 ),
                 Tool(
                     name="list_posts",
@@ -227,20 +249,20 @@ class WordPressMCPServer:
                             "per_page": {
                                 "type": "integer",
                                 "description": "Posts por página (default: 10)",
-                                "default": 10
+                                "default": 10,
                             },
                             "page": {
                                 "type": "integer",
                                 "description": "Número de página (default: 1)",
-                                "default": 1
+                                "default": 1,
                             },
                             "status": {
                                 "type": "string",
                                 "description": "Estado del post: publish, draft, pending, any (default: any)",
-                                "default": "any"
-                            }
-                        }
-                    }
+                                "default": "any",
+                            },
+                        },
+                    },
                 ),
                 Tool(
                     name="search_posts",
@@ -250,16 +272,16 @@ class WordPressMCPServer:
                         "properties": {
                             "search": {
                                 "type": "string",
-                                "description": "Término de búsqueda"
+                                "description": "Término de búsqueda",
                             },
                             "per_page": {
                                 "type": "integer",
                                 "description": "Número de resultados (default: 10)",
-                                "default": 10
-                            }
+                                "default": 10,
+                            },
                         },
-                        "required": ["search"]
-                    }
+                        "required": ["search"],
+                    },
                 ),
                 Tool(
                     name="create_post",
@@ -269,30 +291,30 @@ class WordPressMCPServer:
                         "properties": {
                             "title": {
                                 "type": "string",
-                                "description": "Título del post"
+                                "description": "Título del post",
                             },
                             "content": {
                                 "type": "string",
-                                "description": "Contenido del post (HTML permitido)"
+                                "description": "Contenido del post (HTML permitido)",
                             },
                             "status": {
                                 "type": "string",
                                 "description": "Estado: draft, publish, pending (default: draft)",
-                                "default": "draft"
+                                "default": "draft",
                             },
                             "categories": {
                                 "type": "array",
                                 "items": {"type": "integer"},
-                                "description": "IDs de categorías"
+                                "description": "IDs de categorías",
                             },
                             "tags": {
                                 "type": "array",
                                 "items": {"type": "integer"},
-                                "description": "IDs de etiquetas"
-                            }
+                                "description": "IDs de etiquetas",
+                            },
                         },
-                        "required": ["title", "content"]
-                    }
+                        "required": ["title", "content"],
+                    },
                 ),
                 Tool(
                     name="update_post",
@@ -302,33 +324,27 @@ class WordPressMCPServer:
                         "properties": {
                             "post_id": {
                                 "type": "integer",
-                                "description": "ID del post a actualizar"
+                                "description": "ID del post a actualizar",
                             },
-                            "title": {
-                                "type": "string",
-                                "description": "Nuevo título"
-                            },
+                            "title": {"type": "string", "description": "Nuevo título"},
                             "content": {
                                 "type": "string",
-                                "description": "Nuevo contenido"
+                                "description": "Nuevo contenido",
                             },
-                            "status": {
-                                "type": "string",
-                                "description": "Nuevo estado"
-                            },
+                            "status": {"type": "string", "description": "Nuevo estado"},
                             "categories": {
                                 "type": "array",
                                 "items": {"type": "integer"},
-                                "description": "IDs de categorías"
+                                "description": "IDs de categorías",
                             },
                             "tags": {
                                 "type": "array",
                                 "items": {"type": "integer"},
-                                "description": "IDs de etiquetas"
-                            }
+                                "description": "IDs de etiquetas",
+                            },
                         },
-                        "required": ["post_id"]
-                    }
+                        "required": ["post_id"],
+                    },
                 ),
                 Tool(
                     name="delete_post",
@@ -338,16 +354,16 @@ class WordPressMCPServer:
                         "properties": {
                             "post_id": {
                                 "type": "integer",
-                                "description": "ID del post a eliminar"
+                                "description": "ID del post a eliminar",
                             },
                             "force": {
                                 "type": "boolean",
                                 "description": "true = eliminar permanentemente, false = mover a papelera (default: false)",
-                                "default": False
-                            }
+                                "default": False,
+                            },
                         },
-                        "required": ["post_id"]
-                    }
+                        "required": ["post_id"],
+                    },
                 ),
                 Tool(
                     name="upload_media",
@@ -357,19 +373,19 @@ class WordPressMCPServer:
                         "properties": {
                             "file_path": {
                                 "type": "string",
-                                "description": "Ruta al archivo a subir"
+                                "description": "Ruta al archivo a subir",
                             },
                             "title": {
                                 "type": "string",
-                                "description": "Título del archivo"
+                                "description": "Título del archivo",
                             },
                             "alt_text": {
                                 "type": "string",
-                                "description": "Texto alternativo para imágenes"
-                            }
+                                "description": "Texto alternativo para imágenes",
+                            },
                         },
-                        "required": ["file_path"]
-                    }
+                        "required": ["file_path"],
+                    },
                 ),
                 Tool(
                     name="list_tags",
@@ -380,10 +396,10 @@ class WordPressMCPServer:
                             "per_page": {
                                 "type": "integer",
                                 "description": "Número de etiquetas a obtener (default: 100)",
-                                "default": 100
+                                "default": 100,
                             }
-                        }
-                    }
+                        },
+                    },
                 ),
                 Tool(
                     name="search_tags",
@@ -393,16 +409,16 @@ class WordPressMCPServer:
                         "properties": {
                             "search": {
                                 "type": "string",
-                                "description": "Término de búsqueda"
+                                "description": "Término de búsqueda",
                             },
                             "per_page": {
                                 "type": "integer",
                                 "description": "Número de resultados (default: 10)",
-                                "default": 10
-                            }
+                                "default": 10,
+                            },
                         },
-                        "required": ["search"]
-                    }
+                        "required": ["search"],
+                    },
                 ),
                 Tool(
                     name="create_tag",
@@ -412,19 +428,19 @@ class WordPressMCPServer:
                         "properties": {
                             "name": {
                                 "type": "string",
-                                "description": "Nombre de la etiqueta"
+                                "description": "Nombre de la etiqueta",
                             },
                             "description": {
                                 "type": "string",
-                                "description": "Descripción de la etiqueta"
+                                "description": "Descripción de la etiqueta",
                             },
                             "slug": {
                                 "type": "string",
-                                "description": "Slug de la etiqueta (URL-friendly)"
-                            }
+                                "description": "Slug de la etiqueta (URL-friendly)",
+                            },
                         },
-                        "required": ["name"]
-                    }
+                        "required": ["name"],
+                    },
                 ),
                 # === Herramientas con IA ===
                 Tool(
@@ -435,34 +451,44 @@ class WordPressMCPServer:
                         "properties": {
                             "prompt": {
                                 "type": "string",
-                                "description": "Descripción del tema del post (ej: 'Escribe sobre las ventajas de la inteligencia artificial en medicina')"
+                                "description": "Descripción del tema del post (ej: 'Escribe sobre las ventajas de la inteligencia artificial en medicina')",
                             },
                             "style": {
                                 "type": "string",
-                                "enum": ["profesional", "casual", "técnico", "creativo"],
+                                "enum": [
+                                    "profesional",
+                                    "casual",
+                                    "técnico",
+                                    "creativo",
+                                ],
                                 "description": "Estilo de escritura (default: profesional)",
-                                "default": "profesional"
+                                "default": "profesional",
                             },
                             "tone": {
                                 "type": "string",
-                                "enum": ["informativo", "persuasivo", "educativo", "entretenido"],
+                                "enum": [
+                                    "informativo",
+                                    "persuasivo",
+                                    "educativo",
+                                    "entretenido",
+                                ],
                                 "description": "Tono del contenido (default: informativo)",
-                                "default": "informativo"
+                                "default": "informativo",
                             },
                             "language": {
                                 "type": "string",
                                 "description": "Idioma del contenido (default: español)",
-                                "default": "español"
+                                "default": "español",
                             },
                             "status": {
                                 "type": "string",
                                 "enum": ["draft", "publish", "pending"],
                                 "description": "Estado del post (default: draft)",
-                                "default": "draft"
-                            }
+                                "default": "draft",
+                            },
                         },
-                        "required": ["prompt"]
-                    }
+                        "required": ["prompt"],
+                    },
                 ),
                 Tool(
                     name="improve_post_with_ai",
@@ -472,16 +498,16 @@ class WordPressMCPServer:
                         "properties": {
                             "post_id": {
                                 "type": "integer",
-                                "description": "ID del post a mejorar"
+                                "description": "ID del post a mejorar",
                             },
                             "improvements": {
                                 "type": "string",
                                 "description": "Aspectos a mejorar (ej: 'mejorar SEO y legibilidad', 'hacer más técnico', 'simplificar lenguaje')",
-                                "default": "mejorar SEO, claridad y estructura"
-                            }
+                                "default": "mejorar SEO, claridad y estructura",
+                            },
                         },
-                        "required": ["post_id"]
-                    }
+                        "required": ["post_id"],
+                    },
                 ),
                 Tool(
                     name="generate_content_from_prompt",
@@ -491,28 +517,38 @@ class WordPressMCPServer:
                         "properties": {
                             "prompt": {
                                 "type": "string",
-                                "description": "Descripción del contenido a generar"
+                                "description": "Descripción del contenido a generar",
                             },
                             "style": {
                                 "type": "string",
-                                "enum": ["profesional", "casual", "técnico", "creativo"],
+                                "enum": [
+                                    "profesional",
+                                    "casual",
+                                    "técnico",
+                                    "creativo",
+                                ],
                                 "description": "Estilo de escritura",
-                                "default": "profesional"
+                                "default": "profesional",
                             },
                             "tone": {
                                 "type": "string",
-                                "enum": ["informativo", "persuasivo", "educativo", "entretenido"],
+                                "enum": [
+                                    "informativo",
+                                    "persuasivo",
+                                    "educativo",
+                                    "entretenido",
+                                ],
                                 "description": "Tono del contenido",
-                                "default": "informativo"
+                                "default": "informativo",
                             },
                             "language": {
                                 "type": "string",
                                 "description": "Idioma del contenido",
-                                "default": "español"
-                            }
+                                "default": "español",
+                            },
                         },
-                        "required": ["prompt"]
-                    }
+                        "required": ["prompt"],
+                    },
                 ),
             ]
 
@@ -521,115 +557,131 @@ class WordPressMCPServer:
             """Ejecuta una herramienta"""
 
             if not self.wp:
-                return [TextContent(
-                    type="text",
-                    text=json.dumps({"error": "WordPress API no inicializado. Configure WP_URL, WP_USERNAME y WP_PASSWORD"})
-                )]
+                return [
+                    TextContent(
+                        type="text",
+                        text=json.dumps(
+                            {
+                                "error": "WordPress API no inicializado. Configure WP_URL, WP_USERNAME y WP_PASSWORD"
+                            }
+                        ),
+                    )
+                ]
 
             try:
                 result = None
 
                 if name == "list_categories":
                     result = await self.wp.list_categories(
-                        per_page=arguments.get('per_page', 100)
+                        per_page=arguments.get("per_page", 100)
                     )
 
                 elif name == "list_posts":
                     result = await self.wp.list_posts(
-                        per_page=arguments.get('per_page', 10),
-                        page=arguments.get('page', 1),
-                        status=arguments.get('status', 'any')
+                        per_page=arguments.get("per_page", 10),
+                        page=arguments.get("page", 1),
+                        status=arguments.get("status", "any"),
                     )
 
                 elif name == "search_posts":
                     result = await self.wp.search_posts(
-                        search=arguments['search'],
-                        per_page=arguments.get('per_page', 10)
+                        search=arguments["search"],
+                        per_page=arguments.get("per_page", 10),
                     )
 
                 elif name == "create_post":
                     result = await self.wp.create_post(
-                        title=arguments['title'],
-                        content=arguments['content'],
-                        status=arguments.get('status', 'draft'),
-                        categories=arguments.get('categories'),
-                        tags=arguments.get('tags')
+                        title=arguments["title"],
+                        content=arguments["content"],
+                        status=arguments.get("status", "draft"),
+                        categories=arguments.get("categories"),
+                        tags=arguments.get("tags"),
                     )
 
                 elif name == "update_post":
-                    post_id = arguments.pop('post_id')
+                    post_id = arguments.pop("post_id")
                     result = await self.wp.update_post(post_id, **arguments)
 
                 elif name == "delete_post":
                     result = await self.wp.delete_post(
-                        post_id=arguments['post_id'],
-                        force=arguments.get('force', False)
+                        post_id=arguments["post_id"],
+                        force=arguments.get("force", False),
                     )
 
                 elif name == "upload_media":
                     result = await self.wp.upload_media(
-                        file_path=arguments['file_path'],
-                        title=arguments.get('title'),
-                        alt_text=arguments.get('alt_text')
+                        file_path=arguments["file_path"],
+                        title=arguments.get("title"),
+                        alt_text=arguments.get("alt_text"),
                     )
 
                 elif name == "list_tags":
                     result = await self.wp.list_tags(
-                        per_page=arguments.get('per_page', 100)
+                        per_page=arguments.get("per_page", 100)
                     )
 
                 elif name == "search_tags":
                     result = await self.wp.search_tags(
-                        search=arguments['search'],
-                        per_page=arguments.get('per_page', 10)
+                        search=arguments["search"],
+                        per_page=arguments.get("per_page", 10),
                     )
 
                 elif name == "create_tag":
                     result = await self.wp.create_tag(
-                        name=arguments['name'],
-                        description=arguments.get('description'),
-                        slug=arguments.get('slug')
+                        name=arguments["name"],
+                        description=arguments.get("description"),
+                        slug=arguments.get("slug"),
                     )
 
                 # === Herramientas con IA ===
                 elif name == "generate_post_with_ai":
                     # Verificar que el generador de IA esté disponible
                     if not self.ai_generator or not self.ai_generator.is_available():
-                        return [TextContent(
-                            type="text",
-                            text=json.dumps({
-                                "error": "Generador de IA no disponible. Configure ANTHROPIC_API_KEY en las variables de entorno."
-                            })
-                        )]
+                        return [
+                            TextContent(
+                                type="text",
+                                text=json.dumps(
+                                    {
+                                        "error": "Generador de IA no disponible. Configure ANTHROPIC_API_KEY en las variables de entorno."
+                                    }
+                                ),
+                            )
+                        ]
 
-                    logger.info(f"🤖 Generando post con IA: {arguments['prompt'][:50]}...")
+                    logger.info(
+                        f"🤖 Generando post con IA: {arguments['prompt'][:50]}..."
+                    )
 
                     # Generar contenido con IA
                     ai_content = self.ai_generator.generate_post_content(
-                        prompt=arguments['prompt'],
-                        style=arguments.get('style', 'profesional'),
-                        tone=arguments.get('tone', 'informativo'),
-                        language=arguments.get('language', 'español')
+                        prompt=arguments["prompt"],
+                        style=arguments.get("style", "profesional"),
+                        tone=arguments.get("tone", "informativo"),
+                        language=arguments.get("language", "español"),
                     )
 
                     if not ai_content:
-                        return [TextContent(
-                            type="text",
-                            text=json.dumps({"error": "Error generando contenido con IA"})
-                        )]
+                        return [
+                            TextContent(
+                                type="text",
+                                text=json.dumps(
+                                    {"error": "Error generando contenido con IA"}
+                                ),
+                            )
+                        ]
 
                     # Crear el post en WordPress
                     try:
                         # Obtener o crear categorías
                         category_ids = []
-                        if ai_content.get('categories'):
-                            for cat_name in ai_content['categories']:
+                        if ai_content.get("categories"):
+                            for cat_name in ai_content["categories"]:
                                 # Buscar categoría existente
                                 cats = await self.wp.list_categories(per_page=100)
                                 found = False
                                 for cat in cats:
-                                    if cat.get('name', '').lower() == cat_name.lower():
-                                        category_ids.append(cat['id'])
+                                    if cat.get("name", "").lower() == cat_name.lower():
+                                        category_ids.append(cat["id"])
                                         found = True
                                         break
 
@@ -637,69 +689,81 @@ class WordPressMCPServer:
                                 if not found:
                                     try:
                                         # Crear categoría (nota: esto requiere permisos adicionales)
-                                        logger.info(f"📁 Usando categoría generada: {cat_name}")
+                                        logger.info(
+                                            f"📁 Usando categoría generada: {cat_name}"
+                                        )
                                     except:
                                         pass
 
                         # Obtener o crear tags
                         tag_ids = []
-                        if ai_content.get('tags'):
-                            for tag_name in ai_content['tags']:
+                        if ai_content.get("tags"):
+                            for tag_name in ai_content["tags"]:
                                 # Buscar tag existente
                                 tags = await self.wp.list_tags(per_page=100)
                                 found = False
                                 for tag in tags:
-                                    if tag.get('name', '').lower() == tag_name.lower():
-                                        tag_ids.append(tag['id'])
+                                    if tag.get("name", "").lower() == tag_name.lower():
+                                        tag_ids.append(tag["id"])
                                         found = True
                                         break
 
                                 # Si no existe, intentar crearlo
                                 if not found:
                                     try:
-                                        new_tag = await self.wp.create_tag(name=tag_name)
-                                        tag_ids.append(new_tag['id'])
+                                        new_tag = await self.wp.create_tag(
+                                            name=tag_name
+                                        )
+                                        tag_ids.append(new_tag["id"])
                                     except:
                                         pass
 
                         # Crear post
                         post_result = await self.wp.create_post(
-                            title=ai_content['title'],
-                            content=ai_content['content'],
-                            status=arguments.get('status', 'draft'),
+                            title=ai_content["title"],
+                            content=ai_content["content"],
+                            status=arguments.get("status", "draft"),
                             categories=category_ids if category_ids else None,
-                            tags=tag_ids if tag_ids else None
+                            tags=tag_ids if tag_ids else None,
                         )
 
                         # Añadir información de la IA a la respuesta
-                        post_result['ai_generated'] = True
-                        post_result['ai_categories'] = ai_content.get('categories', [])
-                        post_result['ai_tags'] = ai_content.get('tags', [])
-                        post_result['excerpt'] = ai_content.get('excerpt', '')
+                        post_result["ai_generated"] = True
+                        post_result["ai_categories"] = ai_content.get("categories", [])
+                        post_result["ai_tags"] = ai_content.get("tags", [])
+                        post_result["excerpt"] = ai_content.get("excerpt", "")
 
                         result = post_result
 
                     except Exception as e:
                         logger.error(f"❌ Error creando post: {e}")
-                        return [TextContent(
-                            type="text",
-                            text=json.dumps({
-                                "error": f"Error creando post en WordPress: {str(e)}",
-                                "ai_content": ai_content
-                            })
-                        )]
+                        return [
+                            TextContent(
+                                type="text",
+                                text=json.dumps(
+                                    {
+                                        "error": f"Error creando post en WordPress: {str(e)}",
+                                        "ai_content": ai_content,
+                                    }
+                                ),
+                            )
+                        ]
 
                 elif name == "improve_post_with_ai":
                     # Verificar que el generador de IA esté disponible
                     if not self.ai_generator or not self.ai_generator.is_available():
-                        return [TextContent(
-                            type="text",
-                            text=json.dumps({
-                                "error": "Generador de IA no disponible. Configure ANTHROPIC_API_KEY en las variables de entorno."
-                            })
-                        )]
+                        return [
+                            TextContent(
+                                type="text",
+                                text=json.dumps(
+                                    {
+                                        "error": "Generador de IA no disponible. Configure ANTHROPIC_API_KEY en las variables de entorno."
+                                    }
+                                ),
+                            )
+                        ]
 
-                    post_id = arguments['post_id']
+                    post_id = arguments["post_id"]
                     logger.info(f"🔧 Mejorando post {post_id} con IA...")
 
                     # Obtener el post actual
@@ -709,106 +773,134 @@ class WordPressMCPServer:
 
                         # Buscar el post por ID (simplificado - en producción usar endpoint específico)
                         for post in posts:
-                            if post.get('id') == post_id:
+                            if post.get("id") == post_id:
                                 current_post = post
                                 break
 
                         if not current_post:
-                            return [TextContent(
-                                type="text",
-                                text=json.dumps({"error": f"Post {post_id} no encontrado"})
-                            )]
+                            return [
+                                TextContent(
+                                    type="text",
+                                    text=json.dumps(
+                                        {"error": f"Post {post_id} no encontrado"}
+                                    ),
+                                )
+                            ]
 
                         # Obtener contenido actual
-                        current_content = current_post.get('content', {}).get('rendered', '')
+                        current_content = current_post.get("content", {}).get(
+                            "rendered", ""
+                        )
 
                         # Mejorar con IA
                         improved_content = self.ai_generator.improve_content(
                             original_content=current_content,
-                            improvements=arguments.get('improvements', 'mejorar SEO, claridad y estructura')
+                            improvements=arguments.get(
+                                "improvements", "mejorar SEO, claridad y estructura"
+                            ),
                         )
 
                         if not improved_content:
-                            return [TextContent(
-                                type="text",
-                                text=json.dumps({"error": "Error mejorando contenido con IA"})
-                            )]
+                            return [
+                                TextContent(
+                                    type="text",
+                                    text=json.dumps(
+                                        {"error": "Error mejorando contenido con IA"}
+                                    ),
+                                )
+                            ]
 
                         # Actualizar post
                         result = await self.wp.update_post(
-                            post_id=post_id,
-                            content=improved_content
+                            post_id=post_id, content=improved_content
                         )
 
-                        result['ai_improved'] = True
+                        result["ai_improved"] = True
 
                     except Exception as e:
                         logger.error(f"❌ Error mejorando post: {e}")
-                        return [TextContent(
-                            type="text",
-                            text=json.dumps({"error": f"Error mejorando post: {str(e)}"})
-                        )]
+                        return [
+                            TextContent(
+                                type="text",
+                                text=json.dumps(
+                                    {"error": f"Error mejorando post: {str(e)}"}
+                                ),
+                            )
+                        ]
 
                 elif name == "generate_content_from_prompt":
                     # Verificar que el generador de IA esté disponible
                     if not self.ai_generator or not self.ai_generator.is_available():
-                        return [TextContent(
-                            type="text",
-                            text=json.dumps({
-                                "error": "Generador de IA no disponible. Configure ANTHROPIC_API_KEY en las variables de entorno."
-                            })
-                        )]
+                        return [
+                            TextContent(
+                                type="text",
+                                text=json.dumps(
+                                    {
+                                        "error": "Generador de IA no disponible. Configure ANTHROPIC_API_KEY en las variables de entorno."
+                                    }
+                                ),
+                            )
+                        ]
 
-                    logger.info(f"🤖 Generando contenido con IA: {arguments['prompt'][:50]}...")
+                    logger.info(
+                        f"🤖 Generando contenido con IA: {arguments['prompt'][:50]}..."
+                    )
 
                     # Generar contenido con IA
                     ai_content = self.ai_generator.generate_post_content(
-                        prompt=arguments['prompt'],
-                        style=arguments.get('style', 'profesional'),
-                        tone=arguments.get('tone', 'informativo'),
-                        language=arguments.get('language', 'español')
+                        prompt=arguments["prompt"],
+                        style=arguments.get("style", "profesional"),
+                        tone=arguments.get("tone", "informativo"),
+                        language=arguments.get("language", "español"),
                     )
 
                     if not ai_content:
-                        return [TextContent(
-                            type="text",
-                            text=json.dumps({"error": "Error generando contenido con IA"})
-                        )]
+                        return [
+                            TextContent(
+                                type="text",
+                                text=json.dumps(
+                                    {"error": "Error generando contenido con IA"}
+                                ),
+                            )
+                        ]
 
                     result = {
                         "success": True,
                         "ai_generated": True,
-                        "content": ai_content
+                        "content": ai_content,
                     }
 
                 else:
-                    return [TextContent(
-                        type="text",
-                        text=json.dumps({"error": f"Herramienta desconocida: {name}"})
-                    )]
+                    return [
+                        TextContent(
+                            type="text",
+                            text=json.dumps(
+                                {"error": f"Herramienta desconocida: {name}"}
+                            ),
+                        )
+                    ]
 
-                return [TextContent(
-                    type="text",
-                    text=json.dumps(result, indent=2, ensure_ascii=False)
-                )]
+                return [
+                    TextContent(
+                        type="text",
+                        text=json.dumps(result, indent=2, ensure_ascii=False),
+                    )
+                ]
 
             except Exception as e:
-                return [TextContent(
-                    type="text",
-                    text=json.dumps({"error": str(e)})
-                )]
+                return [TextContent(type="text", text=json.dumps({"error": str(e)}))]
 
     async def run(self):
         """Inicia el servidor MCP"""
 
         wp_url = os.getenv("WP_URL")
-        wp_username = os.getenv("WP_USER")
-        wp_password = os.getenv("WP_APP_PASSWORD")
+        wp_username = os.getenv("WP_USERNAME")
+        wp_password = os.getenv("WP_PASSWORD")
 
         logger.info(
             f"WP_URL={bool(wp_url)} "
-            f"WP_USER={bool(wp_username)} "
-            f"WP_APP_PASSWORD={bool(wp_password)}"
+            f"WP_USERNAME={bool(wp_username)} "
+            f"WP_PASSWORD={bool(wp_password)}"
         )
 
         if not all([wp_url, wp_username, wp_password]):
@@ -816,6 +908,7 @@ class WordPressMCPServer:
             self.wp = None
         else:
             self.wp = WordPressAPI(wp_url, wp_username, wp_password)
+            logger.info("✅ WordPress API inicializado correctamente")
 
         async with stdio_server() as (read_stream, write_stream):
             await self.server.run(
@@ -823,7 +916,6 @@ class WordPressMCPServer:
                 write_stream,
                 self.server.create_initialization_options(),
             )
-
 
 
 async def main():
