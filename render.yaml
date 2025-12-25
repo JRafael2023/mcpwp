@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: wordpress-mcp-api
+    env: python
+    region: oregon
+    plan: free
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m src.http_server
+    envVars:
+      - key: WP_URL
+        sync: false
+      - key: WP_USERNAME
+        sync: false
+      - key: WP_PASSWORD
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: PORT
+        value: 10000

@@ -1,12 +1,18 @@
-mcp
+# Core MCP y utilidades
+mcp>=1.0.0
 pydantic>=2.0.0
-httpx>=0.25.0
-python-wordpress-xmlrpc>=2.3
-requests>=2.31.0
 python-dotenv>=0.19.0
+
+# Cliente HTTP
+httpx>=0.25.0
+requests>=2.31.0
+
+# Servidor HTTP (FastAPI)
 fastapi>=0.104.0
-uvicorn>=0.24.0
-pyyaml>=6.0
-cryptography>=41.0.0
-openai>=1.0.0
-pillow>=10.0.0 
+uvicorn[standard]>=0.24.0
+
+# IA - Claude (Anthropic)
+anthropic>=0.18.0
+
+# Opcional: OpenAI (si decides cambiar a GPT)
+# openai>=1.0.0 
