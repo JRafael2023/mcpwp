@@ -76,8 +76,8 @@ async def startup_event():
 
     # Verificar variables de entorno
     wp_url = os.getenv('WP_URL')
-    wp_username = os.getenv('WP_USERNAME')
-    wp_password = os.getenv('WP_PASSWORD')
+    wp_username = os.getenv('WP_USER')  # Render usa WP_USER
+    wp_password = os.getenv('WP_APP_PASSWORD')  # Render usa WP_APP_PASSWORD
 
     if not all([wp_url, wp_username, wp_password]):
         raise RuntimeError("Faltan credenciales de WordPress en variables de entorno")

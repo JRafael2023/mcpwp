@@ -894,13 +894,13 @@ class WordPressMCPServer:
         """Inicia el servidor MCP"""
 
         wp_url = os.getenv("WP_URL")
-        wp_username = os.getenv("WP_USERNAME")
-        wp_password = os.getenv("WP_PASSWORD")
+        wp_username = os.getenv("WP_USER")
+        wp_password = os.getenv("WP_APP_PASSWORD")
 
         logger.info(
             f"WP_URL={bool(wp_url)} "
-            f"WP_USERNAME={bool(wp_username)} "
-            f"WP_PASSWORD={bool(wp_password)}"
+            f"WP_USER={bool(wp_username)} "
+            f"WP_APP_PASSWORD={bool(wp_password)}"
         )
 
         if not all([wp_url, wp_username, wp_password]):
