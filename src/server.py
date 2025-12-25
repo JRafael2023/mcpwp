@@ -801,29 +801,29 @@ class WordPressMCPServer:
     async def run(self):
         """Inicia el servidor MCP"""
 
-        # Obtener credenciales de variables de entorno
-        wp_url = os.getenv('WP_URL')
-        wp_username = os.getenv('WP_USER')
-        wp_password = os.getenv('WP_APP_PASSWORD')
+        wp_url = os.getenv("WP_URL")
+        wp_username = os.getenv("WP_USER")
+        wp_password = os.getenv("WP_APP_PASSWORD")
 
-        print("WP_URL =", wp_url)
-        print("WP_USER =", wp_username)
-        print("WP_APP_PASSWORD =", wp_password)
-        
+        logger.info(
+            f"WP_URL={bool(wp_url)} "
+            f"WP_USER={bool(wp_username)} "
+            f"WP_APP_PASSWORD={bool(wp_password)}"
+        )
+
         if not all([wp_url, wp_username, wp_password]):
-            print("ERROR: Debes configurar WP_URL, WP_USERNAME y WP_PASSWORD", file=sys.stderr)
-            sys.exit(1)
+            logger.warning("⚠️ WordPress no configurado todavía. MCP iniciará sin WP.")
+            self.wp = None
+        else:
+            self.wp = WordPressAPI(wp_url, wp_username, wp_password)
 
-        # Inicializar cliente de WordPress
-        self.wp = WordPressAPI(wp_url, wp_username, wp_password)
-
-        # Iniciar servidor STDIO
         async with stdio_server() as (read_stream, write_stream):
             await self.server.run(
                 read_stream,
                 write_stream,
-                self.server.create_initialization_options()
+                self.server.create_initialization_options(),
             )
+
 
 
 async def main():
