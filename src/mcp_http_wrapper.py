@@ -50,13 +50,19 @@ async def startup():
     """Inicializa el servidor MCP"""
     global mcp_server
 
-    # Verificar credenciales
+    # Verificar credenciales (usar WP_USER y WP_APP_PASSWORD para compatibilidad con Render)
     wp_url = os.getenv('WP_URL')
-    wp_username = os.getenv('WP_USERNAME')
-    wp_password = os.getenv('WP_PASSWORD')
+    wp_username = os.getenv('WP_USER') or os.getenv('WP_USERNAME')
+    wp_password = os.getenv('WP_APP_PASSWORD') or os.getenv('WP_PASSWORD')
+
+    logger.info(f"WP_URL={bool(wp_url)} WP_USER={bool(wp_username)} WP_APP_PASSWORD={bool(wp_password)}")
 
     if not all([wp_url, wp_username, wp_password]):
-        raise RuntimeError("Faltan credenciales de WordPress")
+        raise RuntimeError("Faltan credenciales de WordPress. Configure WP_URL, WP_USER y WP_APP_PASSWORD")
+
+    # Configurar variables de entorno para el servidor MCP
+    os.environ['WP_USER'] = wp_username
+    os.environ['WP_APP_PASSWORD'] = wp_password
 
     # Inicializar servidor MCP
     mcp_server = WordPressMCPServer()

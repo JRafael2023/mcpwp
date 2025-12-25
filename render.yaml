@@ -6,13 +6,13 @@ services:
     plan: free
     branch: main
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn src.http_server:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn src.mcp_http_wrapper:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: WP_URL
         sync: false
-      - key: WP_USERNAME
+      - key: WP_USER
         sync: false
-      - key: WP_PASSWORD
+      - key: WP_APP_PASSWORD
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
