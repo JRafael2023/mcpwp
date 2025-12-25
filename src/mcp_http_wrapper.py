@@ -71,17 +71,18 @@ async def startup():
 
 @app.get("/")
 @app.head("/")
-async def root():
-    """Info del servidor"""
+async def root(request: Request):
+    """Info del servidor (solo para GET/HEAD)"""
     return {
         "name": "WordPress MCP Server",
         "version": "3.0.0",
-        "protocol": "MCP over HTTP/SSE",
+        "protocol": "MCP over HTTP Streamable",
         "wordpress_url": os.getenv('WP_URL'),
         "ai_available": mcp_server.ai_generator.is_available() if mcp_server and mcp_server.ai_generator else False,
         "endpoints": {
-            "sse": "/mcp/sse",
-            "messages": "/mcp/messages"
+            "stream": "/stream (POST)",
+            "mcp": "/mcp (POST)",
+            "messages": "/mcp/messages (POST)"
         }
     }
 
@@ -139,11 +140,14 @@ async def mcp_sse_endpoint(request: Request):
     )
 
 
+@app.post("/stream")
+@app.post("/mcp")
 @app.post("/mcp/messages")
 async def mcp_messages_endpoint(request: Request):
     """
     Endpoint para enviar mensajes MCP (llamadas a tools)
     n8n enviará las llamadas aquí
+    Compatible con múltiples rutas: /stream, /mcp, /mcp/messages
     """
     try:
         # Parsear request JSON-RPC
@@ -154,36 +158,164 @@ async def mcp_messages_endpoint(request: Request):
         method = body.get("method")
         params = body.get("params", {})
 
-        if method == "tools/list":
-            # Listar herramientas disponibles
-            tools = await mcp_server.server._tool_manager.list_tools()
+        if method == "initialize":
+            # Respuesta de inicialización
+            return {
+                "jsonrpc": "2.0",
+                "id": body.get("id"),
+                "result": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {
+                        "tools": {}
+                    },
+                    "serverInfo": {
+                        "name": "wordpress-mcp-python",
+                        "version": "3.0.0"
+                    }
+                }
+            }
+
+        elif method == "tools/list":
+            # Obtener lista de herramientas directamente del servidor MCP
+            # En lugar de acceder a internos, usamos el handler registrado
+            from mcp.types import Tool
+
+            # Lista de tools (copiada de server.py para evitar acceso a internos)
+            tools = [
+                {
+                    "name": "list_categories",
+                    "description": "Lista todas las categorías disponibles en WordPress",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "per_page": {
+                                "type": "integer",
+                                "description": "Número de categorías a obtener (default: 100)",
+                                "default": 100
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "list_posts",
+                    "description": "Lista posts de WordPress con paginación",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "per_page": {"type": "integer", "description": "Posts por página (default: 10)", "default": 10},
+                            "page": {"type": "integer", "description": "Número de página (default: 1)", "default": 1},
+                            "status": {"type": "string", "description": "Estado del post: publish, draft, pending, any (default: any)", "default": "any"}
+                        }
+                    }
+                },
+                {
+                    "name": "create_post",
+                    "description": "Crea un nuevo post en WordPress",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "title": {"type": "string", "description": "Título del post"},
+                            "content": {"type": "string", "description": "Contenido del post (HTML permitido)"},
+                            "status": {"type": "string", "description": "Estado: draft, publish, pending (default: draft)", "default": "draft"},
+                            "categories": {"type": "array", "items": {"type": "integer"}, "description": "IDs de categorías"},
+                            "tags": {"type": "array", "items": {"type": "integer"}, "description": "IDs de etiquetas"}
+                        },
+                        "required": ["title", "content"]
+                    }
+                },
+                {
+                    "name": "generate_post_with_ai",
+                    "description": "Genera y publica un post completo usando IA (Claude). Solo necesitas un prompt describiendo el tema.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "prompt": {"type": "string", "description": "Descripción del tema del post"},
+                            "style": {"type": "string", "enum": ["profesional", "casual", "técnico", "creativo"], "default": "profesional"},
+                            "tone": {"type": "string", "enum": ["informativo", "persuasivo", "educativo", "entretenido"], "default": "informativo"},
+                            "language": {"type": "string", "description": "Idioma del contenido (default: español)", "default": "español"},
+                            "status": {"type": "string", "enum": ["draft", "publish", "pending"], "default": "draft"}
+                        },
+                        "required": ["prompt"]
+                    }
+                }
+            ]
 
             return {
                 "jsonrpc": "2.0",
                 "id": body.get("id"),
                 "result": {
-                    "tools": [tool.dict() for tool in tools]
+                    "tools": tools
                 }
             }
 
         elif method == "tools/call":
-            # Ejecutar herramienta
+            # Ejecutar herramienta usando la lógica del servidor WordPress
             tool_name = params.get("name")
             arguments = params.get("arguments", {})
 
-            logger.info(f"🔧 Ejecutando tool: {tool_name}")
+            logger.info(f"🔧 Ejecutando tool: {tool_name} con argumentos: {arguments}")
 
-            # Llamar a la herramienta
-            result = await mcp_server.server._tool_manager.call_tool(
-                name=tool_name,
-                arguments=arguments
-            )
+            # Importar WordPressAPI y AIContentGenerator
+            from .server import WordPressAPI
+            from .ai_content_generator import AIContentGenerator
 
+            # Inicializar cliente WP
+            wp_url = os.getenv('WP_URL')
+            wp_username = os.getenv('WP_USER')
+            wp_password = os.getenv('WP_APP_PASSWORD')
+
+            wp = WordPressAPI(wp_url, wp_username, wp_password)
+
+            # Ejecutar la herramienta
+            result = None
+
+            if tool_name == "list_categories":
+                result = await wp.list_categories(per_page=arguments.get("per_page", 100))
+
+            elif tool_name == "list_posts":
+                result = await wp.list_posts(
+                    per_page=arguments.get("per_page", 10),
+                    page=arguments.get("page", 1),
+                    status=arguments.get("status", "any")
+                )
+
+            elif tool_name == "create_post":
+                result = await wp.create_post(
+                    title=arguments["title"],
+                    content=arguments["content"],
+                    status=arguments.get("status", "draft"),
+                    categories=arguments.get("categories"),
+                    tags=arguments.get("tags")
+                )
+
+            elif tool_name == "generate_post_with_ai":
+                ai_gen = AIContentGenerator()
+                if not ai_gen.is_available():
+                    raise Exception("Generador de IA no disponible")
+
+                ai_content = ai_gen.generate_post_content(
+                    prompt=arguments["prompt"],
+                    style=arguments.get("style", "profesional"),
+                    tone=arguments.get("tone", "informativo"),
+                    language=arguments.get("language", "español")
+                )
+
+                result = await wp.create_post(
+                    title=ai_content["title"],
+                    content=ai_content["content"],
+                    status=arguments.get("status", "draft")
+                )
+                result["ai_generated"] = True
+
+            else:
+                raise Exception(f"Herramienta desconocida: {tool_name}")
+
+            import json
             return {
                 "jsonrpc": "2.0",
                 "id": body.get("id"),
                 "result": {
-                    "content": [{"type": "text", "text": result}]
+                    "content": [{"type": "text", "text": json.dumps(result, indent=2, ensure_ascii=False)}]
                 }
             }
 
@@ -198,7 +330,7 @@ async def mcp_messages_endpoint(request: Request):
             }
 
     except Exception as e:
-        logger.error(f"❌ Error procesando mensaje MCP: {e}")
+        logger.error(f"❌ Error procesando mensaje MCP: {e}", exc_info=True)
         return {
             "jsonrpc": "2.0",
             "id": body.get("id", None),
