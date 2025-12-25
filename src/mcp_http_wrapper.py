@@ -71,7 +71,7 @@ async def startup():
 
 @app.get("/")
 @app.head("/")
-async def root(request: Request):
+async def root_get(request: Request):
     """Info del servidor (solo para GET/HEAD)"""
     return {
         "name": "WordPress MCP Server",
@@ -80,6 +80,7 @@ async def root(request: Request):
         "wordpress_url": os.getenv('WP_URL'),
         "ai_available": mcp_server.ai_generator.is_available() if mcp_server and mcp_server.ai_generator else False,
         "endpoints": {
+            "root": "/ (POST)",
             "stream": "/stream (POST)",
             "mcp": "/mcp (POST)",
             "messages": "/mcp/messages (POST)"
@@ -140,6 +141,7 @@ async def mcp_sse_endpoint(request: Request):
     )
 
 
+@app.post("/")
 @app.post("/stream")
 @app.post("/mcp")
 @app.post("/mcp/messages")
