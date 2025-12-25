@@ -13,6 +13,7 @@ import logging
 from typing import Any, Dict, List, Optional
 import httpx
 from base64 import b64encode
+from fastapi import FastAPI
 
 # Importar el SDK de MCP
 from mcp.server import Server
@@ -30,6 +31,13 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+app = FastAPI()
+
+
+@app.get("/")
+def health():
+    return {"status": "ok"}
 
 
 class WordPressAPI:
