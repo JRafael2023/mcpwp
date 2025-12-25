@@ -806,6 +806,10 @@ class WordPressMCPServer:
         wp_username = os.getenv('WP_USER')
         wp_password = os.getenv('WP_APP_PASSWORD')
 
+         print("WP_URL =", wp_url)
+         print("WP_USER =", wp_username)
+         print("WP_APP_PASSWORD =", "SET" if wp_password else "MISSING")
+        
         if not all([wp_url, wp_username, wp_password]):
             print("ERROR: Debes configurar WP_URL, WP_USERNAME y WP_PASSWORD", file=sys.stderr)
             sys.exit(1)
