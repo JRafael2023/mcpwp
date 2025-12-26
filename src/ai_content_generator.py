@@ -1,5 +1,5 @@
 """
-Generador de Contenido con IA usando Ollama
+Generador de Contenido con IA usando OpenRouter
 Crea contenido para WordPress usando inteligencia artificial
 """
 
@@ -12,22 +12,22 @@ logger = logging.getLogger(__name__)
 
 
 class AIContentGenerator:
-    """Generador de contenido usando Ollama"""
+    """Generador de contenido usando OpenRouter"""
 
     def __init__(self):
         """Inicializa el generador de contenido con IA"""
         self.client = None
-        self.model = "llama3.2"  # Modelo de Ollama
-        self.base_url = "https://api.ollama.ai/v1"
+        self.model = "meta-llama/llama-3.2-3b-instruct:free"  # Modelo gratuito de OpenRouter
+        self.base_url = "https://openrouter.ai/api/v1"
 
         # HARDCODED API KEY PARA TEST (sin necesidad de ENV)
-        self.api_key = "84fdf9496fbe4486a82d44b7aab28745.olHU14sgXXTTllUN8LSh4x5Z"
+        self.api_key = "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"
 
         try:
             self.client = True  # Marcamos como disponible
-            logger.info("✅ Generador de contenido con Ollama inicializado correctamente")
+            logger.info("✅ Generador de contenido con OpenRouter inicializado correctamente")
         except Exception as e:
-            logger.error(f"❌ Error al inicializar cliente de Ollama: {e}")
+            logger.error(f"❌ Error al inicializar cliente de OpenRouter: {e}")
             self.client = None
 
     def is_available(self) -> bool:
@@ -43,7 +43,7 @@ class AIContentGenerator:
         max_tokens: int = 4000
     ) -> Optional[Dict[str, str]]:
         """
-        Genera contenido completo para un post usando Claude
+        Genera contenido completo para un post usando OpenRouter
 
         Args:
             prompt: El tema o descripción del post a crear
@@ -60,8 +60,8 @@ class AIContentGenerator:
             return None
 
         try:
-            # Construir el prompt completo
-            full_prompt = f"""Eres un experto creador de contenido para WordPress.
+            # Construir el prompt del sistema
+            system_prompt = f"""Eres un experto creador de contenido para WordPress.
 Tu tarea es generar artículos de alta calidad, SEO-optimizados y bien estructurados.
 
 Estilo: {style}
@@ -77,33 +77,35 @@ IMPORTANTE: Debes responder SOLO con un objeto JSON válido con la siguiente est
     "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"]
 }}
 
-NO incluyas ningún texto adicional fuera del JSON. El contenido debe estar en formato HTML válido.
+NO incluyas ningún texto adicional fuera del JSON. El contenido debe estar en formato HTML válido."""
 
-Tema del artículo: {prompt}"""
-
-            # Llamar a Ollama
-            logger.info(f"🤖 Generando contenido con Ollama para: {prompt[:50]}...")
+            # Llamar a OpenRouter
+            logger.info(f"🤖 Generando contenido con OpenRouter para: {prompt[:50]}...")
 
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/JRafael2023/mcpwp",
+                "X-Title": "WordPress MCP Server"
             }
 
             payload = {
                 "model": self.model,
-                "prompt": full_prompt,
-                "stream": False
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Tema del artículo: {prompt}"}
+                ]
             }
 
             response = requests.post(
-                f"{self.base_url}/generate",
+                f"{self.base_url}/chat/completions",
                 headers=headers,
                 json=payload,
                 timeout=120
             )
 
             response.raise_for_status()
-            content = response.json().get("response", "")
+            content = response.json()["choices"][0]["message"]["content"]
 
             logger.info(f"✅ Contenido generado exitosamente ({len(content)} caracteres)")
             logger.debug(f"📄 Contenido: {content[:200]}...")
@@ -133,12 +135,12 @@ Tema del artículo: {prompt}"""
                 return result
 
             except json.JSONDecodeError as e:
-                logger.error(f"❌ Error al parsear JSON de Ollama: {e}")
+                logger.error(f"❌ Error al parsear JSON de OpenRouter: {e}")
                 logger.error(f"📄 Respuesta recibida: {content[:500]}")
                 return None
 
         except Exception as e:
-            logger.error(f"❌ Error generando contenido con Ollama: {e}")
+            logger.error(f"❌ Error generando contenido con OpenRouter: {e}")
             return None
 
     def generate_simple_content(
@@ -150,39 +152,43 @@ Tema del artículo: {prompt}"""
         Genera contenido simple basado en un prompt
 
         Args:
-            prompt: Instrucción o pregunta para Ollama
+            prompt: Instrucción o pregunta para OpenRouter
             max_tokens: Máximo de tokens a generar
 
         Returns:
-            Texto generado por Ollama
+            Texto generado por OpenRouter
         """
         if not self.is_available():
             logger.error("❌ Generador de IA no disponible")
             return None
 
         try:
-            logger.info(f"🤖 Generando respuesta simple con Ollama...")
+            logger.info(f"🤖 Generando respuesta simple con OpenRouter...")
 
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/JRafael2023/mcpwp",
+                "X-Title": "WordPress MCP Server"
             }
 
             payload = {
                 "model": self.model,
-                "prompt": prompt,
-                "stream": False
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": max_tokens
             }
 
             response = requests.post(
-                f"{self.base_url}/generate",
+                f"{self.base_url}/chat/completions",
                 headers=headers,
                 json=payload,
                 timeout=60
             )
 
             response.raise_for_status()
-            content = response.json().get("response", "")
+            content = response.json()["choices"][0]["message"]["content"]
             logger.info(f"✅ Respuesta generada: {len(content)} caracteres")
 
             return content
@@ -197,7 +203,7 @@ Tema del artículo: {prompt}"""
         improvements: str = "mejorar SEO, claridad y estructura"
     ) -> Optional[str]:
         """
-        Mejora contenido existente usando Ollama
+        Mejora contenido existente usando OpenRouter
 
         Args:
             original_content: Contenido original a mejorar
@@ -218,28 +224,31 @@ Contenido original:
 
 Devuelve el contenido mejorado en formato HTML válido, manteniendo la estructura pero optimizando el texto."""
 
-            logger.info(f"🤖 Mejorando contenido con Ollama...")
+            logger.info(f"🤖 Mejorando contenido con OpenRouter...")
 
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/JRafael2023/mcpwp",
+                "X-Title": "WordPress MCP Server"
             }
 
             payload = {
                 "model": self.model,
-                "prompt": prompt,
-                "stream": False
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ]
             }
 
             response = requests.post(
-                f"{self.base_url}/generate",
+                f"{self.base_url}/chat/completions",
                 headers=headers,
                 json=payload,
                 timeout=120
             )
 
             response.raise_for_status()
-            improved = response.json().get("response", "")
+            improved = response.json()["choices"][0]["message"]["content"]
             logger.info(f"✅ Contenido mejorado exitosamente")
 
             return improved
