@@ -182,7 +182,7 @@ async def mcp_messages_endpoint(request: Request):
             # En lugar de acceder a internos, usamos el handler registrado
             from mcp.types import Tool
 
-            # Lista de tools (copiada de server.py para evitar acceso a internos)
+            # Lista COMPLETA de tools (copiada de server.py)
             tools = [
                 {
                     "name": "list_categories",
@@ -190,11 +190,7 @@ async def mcp_messages_endpoint(request: Request):
                     "inputSchema": {
                         "type": "object",
                         "properties": {
-                            "per_page": {
-                                "type": "integer",
-                                "description": "Número de categorías a obtener (default: 100)",
-                                "default": 100
-                            }
+                            "per_page": {"type": "integer", "description": "Número de categorías a obtener (default: 100)", "default": 100}
                         }
                     }
                 },
@@ -208,6 +204,18 @@ async def mcp_messages_endpoint(request: Request):
                             "page": {"type": "integer", "description": "Número de página (default: 1)", "default": 1},
                             "status": {"type": "string", "description": "Estado del post: publish, draft, pending, any (default: any)", "default": "any"}
                         }
+                    }
+                },
+                {
+                    "name": "search_posts",
+                    "description": "Busca posts por término de búsqueda",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "search": {"type": "string", "description": "Término de búsqueda"},
+                            "per_page": {"type": "integer", "description": "Número de resultados (default: 10)", "default": 10}
+                        },
+                        "required": ["search"]
                     }
                 },
                 {
@@ -226,8 +234,84 @@ async def mcp_messages_endpoint(request: Request):
                     }
                 },
                 {
+                    "name": "update_post",
+                    "description": "Actualiza un post existente",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "post_id": {"type": "integer", "description": "ID del post a actualizar"},
+                            "title": {"type": "string", "description": "Nuevo título"},
+                            "content": {"type": "string", "description": "Nuevo contenido"},
+                            "status": {"type": "string", "description": "Nuevo estado"},
+                            "categories": {"type": "array", "items": {"type": "integer"}, "description": "IDs de categorías"},
+                            "tags": {"type": "array", "items": {"type": "integer"}, "description": "IDs de etiquetas"}
+                        },
+                        "required": ["post_id"]
+                    }
+                },
+                {
+                    "name": "delete_post",
+                    "description": "Elimina un post (mueve a papelera o elimina permanentemente)",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "post_id": {"type": "integer", "description": "ID del post a eliminar"},
+                            "force": {"type": "boolean", "description": "true = eliminar permanentemente, false = mover a papelera (default: false)", "default": False}
+                        },
+                        "required": ["post_id"]
+                    }
+                },
+                {
+                    "name": "upload_media",
+                    "description": "Sube un archivo multimedia a WordPress",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "file_path": {"type": "string", "description": "Ruta al archivo a subir"},
+                            "title": {"type": "string", "description": "Título del archivo"},
+                            "alt_text": {"type": "string", "description": "Texto alternativo para imágenes"}
+                        },
+                        "required": ["file_path"]
+                    }
+                },
+                {
+                    "name": "list_tags",
+                    "description": "Lista todas las etiquetas (tags) disponibles",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "per_page": {"type": "integer", "description": "Número de etiquetas a obtener (default: 100)", "default": 100}
+                        }
+                    }
+                },
+                {
+                    "name": "search_tags",
+                    "description": "Busca etiquetas por término",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "search": {"type": "string", "description": "Término de búsqueda"},
+                            "per_page": {"type": "integer", "description": "Número de resultados (default: 10)", "default": 10}
+                        },
+                        "required": ["search"]
+                    }
+                },
+                {
+                    "name": "create_tag",
+                    "description": "Crea una nueva etiqueta",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string", "description": "Nombre de la etiqueta"},
+                            "description": {"type": "string", "description": "Descripción de la etiqueta"},
+                            "slug": {"type": "string", "description": "Slug de la etiqueta (URL-friendly)"}
+                        },
+                        "required": ["name"]
+                    }
+                },
+                {
                     "name": "generate_post_with_ai",
-                    "description": "Genera y publica un post completo usando IA (Claude). Solo necesitas un prompt describiendo el tema.",
+                    "description": "Genera y publica un post completo usando IA (Groq). Solo necesitas un prompt describiendo el tema.",
                     "inputSchema": {
                         "type": "object",
                         "properties": {
@@ -281,6 +365,12 @@ async def mcp_messages_endpoint(request: Request):
                     status=arguments.get("status", "any")
                 )
 
+            elif tool_name == "search_posts":
+                result = await wp.search_posts(
+                    search=arguments["search"],
+                    per_page=arguments.get("per_page", 10)
+                )
+
             elif tool_name == "create_post":
                 result = await wp.create_post(
                     title=arguments["title"],
@@ -288,6 +378,45 @@ async def mcp_messages_endpoint(request: Request):
                     status=arguments.get("status", "draft"),
                     categories=arguments.get("categories"),
                     tags=arguments.get("tags")
+                )
+
+            elif tool_name == "update_post":
+                result = await wp.update_post(
+                    post_id=arguments["post_id"],
+                    title=arguments.get("title"),
+                    content=arguments.get("content"),
+                    status=arguments.get("status"),
+                    categories=arguments.get("categories"),
+                    tags=arguments.get("tags")
+                )
+
+            elif tool_name == "delete_post":
+                result = await wp.delete_post(
+                    post_id=arguments["post_id"],
+                    force=arguments.get("force", False)
+                )
+
+            elif tool_name == "upload_media":
+                result = await wp.upload_media(
+                    file_path=arguments["file_path"],
+                    title=arguments.get("title"),
+                    alt_text=arguments.get("alt_text")
+                )
+
+            elif tool_name == "list_tags":
+                result = await wp.list_tags(per_page=arguments.get("per_page", 100))
+
+            elif tool_name == "search_tags":
+                result = await wp.search_tags(
+                    search=arguments["search"],
+                    per_page=arguments.get("per_page", 10)
+                )
+
+            elif tool_name == "create_tag":
+                result = await wp.create_tag(
+                    name=arguments["name"],
+                    description=arguments.get("description"),
+                    slug=arguments.get("slug")
                 )
 
             elif tool_name == "generate_post_with_ai":

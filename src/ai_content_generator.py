@@ -21,8 +21,13 @@ class AIContentGenerator:
         self.model = "llama-3.3-70b-versatile"  # Modelo de Groq (gratis y rápido)
         self.base_url = "https://api.groq.com/openai/v1"
 
-        # HARDCODED API KEY PARA TEST (sin necesidad de ENV)
-        self.api_key = "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"
+        # Obtener API key de variable de entorno
+        self.api_key = os.getenv('GROQ_API_KEY')
+
+        if not self.api_key:
+            logger.error("GROQ_API_KEY no configurada en variables de entorno")
+            self.client = None
+            return
 
         try:
             self.client = True  # Marcamos como disponible
