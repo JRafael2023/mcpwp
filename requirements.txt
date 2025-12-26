@@ -11,8 +11,5 @@ requests>=2.31.0
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 
-# IA - Claude (Anthropic)
-anthropic>=0.18.0
-
-# Opcional: OpenAI (si decides cambiar a GPT)
-# openai>=1.0.0 
+# IA - Ollama (API gratuita)
+# No requiere paquete adicional, solo requests 

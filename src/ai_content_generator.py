@@ -1,35 +1,34 @@
 """
-Generador de Contenido con IA usando Claude (Anthropic)
+Generador de Contenido con IA usando Ollama
 Crea contenido para WordPress usando inteligencia artificial
 """
 
 import os
 import logging
 from typing import Dict, Optional
-from anthropic import Anthropic
+import requests
 
 logger = logging.getLogger(__name__)
 
 
 class AIContentGenerator:
-    """Generador de contenido usando Claude de Anthropic"""
+    """Generador de contenido usando Ollama"""
 
     def __init__(self):
         """Inicializa el generador de contenido con IA"""
         self.client = None
-        self.model = "claude-3-5-sonnet-20241022"  # Modelo más reciente y potente
+        self.model = "llama3.2"  # Modelo de Ollama
+        self.base_url = "https://api.ollama.ai/v1"
 
-        # Inicializar cliente de Anthropic si la API key está disponible
-        api_key = os.getenv('ANTHROPIC_API_KEY')
-        if api_key:
-            try:
-                self.client = Anthropic(api_key=api_key)
-                logger.info("✅ Generador de contenido con Claude inicializado correctamente")
-            except Exception as e:
-                logger.error(f"❌ Error al inicializar cliente de Anthropic: {e}")
-                self.client = None
-        else:
-            logger.warning("⚠️ ANTHROPIC_API_KEY no encontrada - generación de contenido IA deshabilitada")
+        # HARDCODED API KEY PARA TEST (sin necesidad de ENV)
+        self.api_key = "84fdf9496fbe4486a82d44b7aab28745.olHU14sgXXTTllUN8LSh4x5Z"
+
+        try:
+            self.client = True  # Marcamos como disponible
+            logger.info("✅ Generador de contenido con Ollama inicializado correctamente")
+        except Exception as e:
+            logger.error(f"❌ Error al inicializar cliente de Ollama: {e}")
+            self.client = None
 
     def is_available(self) -> bool:
         """Verifica si el generador de IA está disponible"""
@@ -61,8 +60,8 @@ class AIContentGenerator:
             return None
 
         try:
-            # Construir el prompt del sistema
-            system_prompt = f"""Eres un experto creador de contenido para WordPress.
+            # Construir el prompt completo
+            full_prompt = f"""Eres un experto creador de contenido para WordPress.
 Tu tarea es generar artículos de alta calidad, SEO-optimizados y bien estructurados.
 
 Estilo: {style}
@@ -78,25 +77,33 @@ IMPORTANTE: Debes responder SOLO con un objeto JSON válido con la siguiente est
     "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"]
 }}
 
-NO incluyas ningún texto adicional fuera del JSON. El contenido debe estar en formato HTML válido."""
+NO incluyas ningún texto adicional fuera del JSON. El contenido debe estar en formato HTML válido.
 
-            # Llamar a Claude
-            logger.info(f"🤖 Generando contenido con Claude para: {prompt[:50]}...")
+Tema del artículo: {prompt}"""
 
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=max_tokens,
-                system=system_prompt,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ]
+            # Llamar a Ollama
+            logger.info(f"🤖 Generando contenido con Ollama para: {prompt[:50]}...")
+
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+
+            payload = {
+                "model": self.model,
+                "prompt": full_prompt,
+                "stream": False
+            }
+
+            response = requests.post(
+                f"{self.base_url}/generate",
+                headers=headers,
+                json=payload,
+                timeout=120
             )
 
-            # Extraer el contenido
-            content = response.content[0].text
+            response.raise_for_status()
+            content = response.json().get("response", "")
 
             logger.info(f"✅ Contenido generado exitosamente ({len(content)} caracteres)")
             logger.debug(f"📄 Contenido: {content[:200]}...")
@@ -126,12 +133,12 @@ NO incluyas ningún texto adicional fuera del JSON. El contenido debe estar en f
                 return result
 
             except json.JSONDecodeError as e:
-                logger.error(f"❌ Error al parsear JSON de Claude: {e}")
+                logger.error(f"❌ Error al parsear JSON de Ollama: {e}")
                 logger.error(f"📄 Respuesta recibida: {content[:500]}")
                 return None
 
         except Exception as e:
-            logger.error(f"❌ Error generando contenido con Claude: {e}")
+            logger.error(f"❌ Error generando contenido con Ollama: {e}")
             return None
 
     def generate_simple_content(
@@ -143,31 +150,39 @@ NO incluyas ningún texto adicional fuera del JSON. El contenido debe estar en f
         Genera contenido simple basado en un prompt
 
         Args:
-            prompt: Instrucción o pregunta para Claude
+            prompt: Instrucción o pregunta para Ollama
             max_tokens: Máximo de tokens a generar
 
         Returns:
-            Texto generado por Claude
+            Texto generado por Ollama
         """
         if not self.is_available():
             logger.error("❌ Generador de IA no disponible")
             return None
 
         try:
-            logger.info(f"🤖 Generando respuesta simple con Claude...")
+            logger.info(f"🤖 Generando respuesta simple con Ollama...")
 
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=max_tokens,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ]
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+
+            payload = {
+                "model": self.model,
+                "prompt": prompt,
+                "stream": False
+            }
+
+            response = requests.post(
+                f"{self.base_url}/generate",
+                headers=headers,
+                json=payload,
+                timeout=60
             )
 
-            content = response.content[0].text
+            response.raise_for_status()
+            content = response.json().get("response", "")
             logger.info(f"✅ Respuesta generada: {len(content)} caracteres")
 
             return content
@@ -182,7 +197,7 @@ NO incluyas ningún texto adicional fuera del JSON. El contenido debe estar en f
         improvements: str = "mejorar SEO, claridad y estructura"
     ) -> Optional[str]:
         """
-        Mejora contenido existente usando Claude
+        Mejora contenido existente usando Ollama
 
         Args:
             original_content: Contenido original a mejorar
@@ -203,20 +218,28 @@ Contenido original:
 
 Devuelve el contenido mejorado en formato HTML válido, manteniendo la estructura pero optimizando el texto."""
 
-            logger.info(f"🤖 Mejorando contenido con Claude...")
+            logger.info(f"🤖 Mejorando contenido con Ollama...")
 
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=4000,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ]
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+
+            payload = {
+                "model": self.model,
+                "prompt": prompt,
+                "stream": False
+            }
+
+            response = requests.post(
+                f"{self.base_url}/generate",
+                headers=headers,
+                json=payload,
+                timeout=120
             )
 
-            improved = response.content[0].text
+            response.raise_for_status()
+            improved = response.json().get("response", "")
             logger.info(f"✅ Contenido mejorado exitosamente")
 
             return improved
