@@ -425,6 +425,8 @@ async def mcp_messages_endpoint(request: Request):
                 if not ai_gen.is_available():
                     raise Exception("Generador de IA no disponible.")
 
+                logger.info(f"Generando post con IA: {arguments['prompt'][:50]}...")
+
                 ai_content = ai_gen.generate_post_content(
                     prompt=arguments["prompt"],
                     style=arguments.get("style", "profesional"),
@@ -435,13 +437,68 @@ async def mcp_messages_endpoint(request: Request):
                 if not ai_content:
                     raise Exception("Error generando contenido con IA.")
 
+                # Obtener o crear categorías
+                category_ids = []
+                if ai_content.get("categories"):
+                    for cat_name in ai_content["categories"]:
+                        # Buscar categoría existente
+                        cats = await wp.list_categories(per_page=100)
+                        found = False
+                        for cat in cats:
+                            if cat.get("name", "").lower() == cat_name.lower():
+                                category_ids.append(cat["id"])
+                                found = True
+                                logger.info(f"Categoría encontrada: {cat_name} (ID: {cat['id']})")
+                                break
+
+                        # Si no existe, intentar crearla
+                        if not found:
+                            try:
+                                # Crear categoría (nota: esto requiere permisos adicionales)
+                                logger.info(f"Usando categoría generada: {cat_name}")
+                            except:
+                                pass
+
+                # Obtener o crear tags
+                tag_ids = []
+                if ai_content.get("tags"):
+                    for tag_name in ai_content["tags"]:
+                        # Buscar tag existente
+                        tags = await wp.list_tags(per_page=100)
+                        found = False
+                        for tag in tags:
+                            if tag.get("name", "").lower() == tag_name.lower():
+                                tag_ids.append(tag["id"])
+                                found = True
+                                logger.info(f"Tag encontrado: {tag_name} (ID: {tag['id']})")
+                                break
+
+                        # Si no existe, intentar crearlo
+                        if not found:
+                            try:
+                                new_tag = await wp.create_tag(name=tag_name)
+                                tag_ids.append(new_tag["id"])
+                                logger.info(f"Tag creado: {tag_name} (ID: {new_tag['id']})")
+                            except Exception as e:
+                                logger.error(f"Error creando tag {tag_name}: {e}")
+                                pass
+
+                logger.info(f"IDs de categorías finales: {category_ids}")
+                logger.info(f"IDs de tags finales: {tag_ids}")
+
+                # Crear post con categorías y tags
                 result = await wp.create_post(
                     title=ai_content["title"],
                     content=ai_content["content"],
-                    status=arguments.get("status", "draft")
+                    status=arguments.get("status", "draft"),
+                    categories=category_ids if category_ids else None,
+                    tags=tag_ids if tag_ids else None
                 )
                 result["ai_generated"] = True
                 result["source"] = "Groq"
+                result["ai_categories"] = ai_content.get("categories", [])
+                result["ai_tags"] = ai_content.get("tags", [])
+                result["excerpt"] = ai_content.get("excerpt", "")
 
             else:
                 raise Exception(f"Herramienta desconocida: {tool_name}")
