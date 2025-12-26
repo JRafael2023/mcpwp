@@ -291,10 +291,10 @@ async def mcp_messages_endpoint(request: Request):
                 )
 
             elif tool_name == "generate_post_with_ai":
-                # NUEVO: Usar OpenRouter para generar contenido directamente
+                # NUEVO: Usar Ollama para generar contenido directamente
                 ai_gen = AIContentGenerator()
                 if not ai_gen.is_available():
-                    raise Exception("Generador de IA no disponible.")
+                    raise Exception("Generador de IA no disponible. Configure OLLAMA_API_KEY en las variables de entorno de Render.")
 
                 ai_content = ai_gen.generate_post_content(
                     prompt=arguments["prompt"],
@@ -304,7 +304,7 @@ async def mcp_messages_endpoint(request: Request):
                 )
 
                 if not ai_content:
-                    raise Exception("Error generando contenido con IA.")
+                    raise Exception("Error generando contenido con IA. Verifique que OLLAMA_API_KEY sea válida.")
 
                 result = await wp.create_post(
                     title=ai_content["title"],
@@ -312,7 +312,7 @@ async def mcp_messages_endpoint(request: Request):
                     status=arguments.get("status", "draft")
                 )
                 result["ai_generated"] = True
-                result["source"] = "OpenRouter"
+                result["source"] = "Ollama"
 
             else:
                 raise Exception(f"Herramienta desconocida: {tool_name}")
