@@ -66,7 +66,7 @@ async def startup():
 
     # Inicializar servidor MCP
     mcp_server = WordPressMCPServer()
-    logger.info(f"✅ WordPress MCP Server inicializado: {wp_url}")
+    logger.info(f"WordPress MCP Server inicializado: {wp_url}")
 
 
 @app.get("/")
@@ -154,7 +154,7 @@ async def mcp_messages_endpoint(request: Request):
     try:
         # Parsear request JSON-RPC
         body = await request.json()
-        logger.info(f"📨 Mensaje MCP recibido: {body.get('method')}")
+        logger.info(f"Mensaje MCP recibido: {body.get('method')}")
 
         # Manejar diferentes métodos
         method = body.get("method")
@@ -255,7 +255,7 @@ async def mcp_messages_endpoint(request: Request):
             tool_name = params.get("name")
             arguments = params.get("arguments", {})
 
-            logger.info(f"🔧 Ejecutando tool: {tool_name} con argumentos: {arguments}")
+            logger.info(f"Ejecutando tool: {tool_name} con argumentos: {arguments}")
 
             # Importar WordPressAPI y AIContentGenerator
             from .server import WordPressAPI
@@ -291,7 +291,7 @@ async def mcp_messages_endpoint(request: Request):
                 )
 
             elif tool_name == "generate_post_with_ai":
-                # NUEVO: Usar OpenRouter para generar contenido directamente
+                # NUEVO: Usar Groq para generar contenido directamente
                 ai_gen = AIContentGenerator()
                 if not ai_gen.is_available():
                     raise Exception("Generador de IA no disponible.")
@@ -312,7 +312,7 @@ async def mcp_messages_endpoint(request: Request):
                     status=arguments.get("status", "draft")
                 )
                 result["ai_generated"] = True
-                result["source"] = "OpenRouter"
+                result["source"] = "Groq"
 
             else:
                 raise Exception(f"Herramienta desconocida: {tool_name}")
@@ -337,7 +337,7 @@ async def mcp_messages_endpoint(request: Request):
             }
 
     except Exception as e:
-        logger.error(f"❌ Error procesando mensaje MCP: {e}", exc_info=True)
+        logger.error(f"Error procesando mensaje MCP: {e}", exc_info=True)
         return {
             "jsonrpc": "2.0",
             "id": body.get("id", None),
@@ -354,11 +354,11 @@ if __name__ == "__main__":
     port = int(os.getenv('PORT', 8000))
 
     print("=" * 60)
-    print("🚀 WordPress MCP Server (HTTP/SSE)")
+    print("WordPress MCP Server (HTTP/SSE)")
     print("=" * 60)
     print(f"Puerto: {port}")
     print(f"WordPress: {os.getenv('WP_URL')}")
-    print(f"IA disponible: {bool(os.getenv('ANTHROPIC_API_KEY'))}")
+    print(f"IA disponible: Groq")
     print()
     print("Endpoints para n8n:")
     print(f"  Endpoint: http://localhost:{port}/mcp/sse")

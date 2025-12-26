@@ -1,5 +1,5 @@
 """
-Generador de Contenido con IA usando OpenRouter
+Generador de Contenido con IA usando Groq
 Crea contenido para WordPress usando inteligencia artificial
 """
 
@@ -7,27 +7,28 @@ import os
 import logging
 from typing import Dict, Optional
 import requests
+import re
 
 logger = logging.getLogger(__name__)
 
 
 class AIContentGenerator:
-    """Generador de contenido usando OpenRouter"""
+    """Generador de contenido usando Groq"""
 
     def __init__(self):
         """Inicializa el generador de contenido con IA"""
         self.client = None
-        self.model = "meta-llama/llama-3.2-3b-instruct:free"  # Modelo gratuito de OpenRouter
-        self.base_url = "https://openrouter.ai/api/v1"
+        self.model = "llama-3.3-70b-versatile"  # Modelo de Groq (gratis y rápido)
+        self.base_url = "https://api.groq.com/openai/v1"
 
         # HARDCODED API KEY PARA TEST (sin necesidad de ENV)
-        self.api_key = "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"
+        self.api_key = "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"
 
         try:
             self.client = True  # Marcamos como disponible
-            logger.info("✅ Generador de contenido con OpenRouter inicializado correctamente")
+            logger.info("Generador de contenido con Groq inicializado correctamente")
         except Exception as e:
-            logger.error(f"❌ Error al inicializar cliente de OpenRouter: {e}")
+            logger.error(f"Error al inicializar cliente de Groq: {e}")
             self.client = None
 
     def is_available(self) -> bool:
@@ -56,7 +57,7 @@ class AIContentGenerator:
             Dict con title, content, excerpt, categories, tags
         """
         if not self.is_available():
-            logger.error("❌ Generador de IA no disponible")
+            logger.error("Generador de IA no disponible")
             return None
 
         try:
@@ -79,14 +80,12 @@ IMPORTANTE: Debes responder SOLO con un objeto JSON válido con la siguiente est
 
 NO incluyas ningún texto adicional fuera del JSON. El contenido debe estar en formato HTML válido."""
 
-            # Llamar a OpenRouter
-            logger.info(f"🤖 Generando contenido con OpenRouter para: {prompt[:50]}...")
+            # Llamar a Groq
+            logger.info(f"Generando contenido con Groq para: {prompt[:50]}...")
 
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/JRafael2023/mcpwp",
-                "X-Title": "WordPress MCP Server"
+                "Content-Type": "application/json"
             }
 
             payload = {
@@ -107,18 +106,61 @@ NO incluyas ningún texto adicional fuera del JSON. El contenido debe estar en f
             response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"]
 
-            logger.info(f"✅ Contenido generado exitosamente ({len(content)} caracteres)")
-            logger.debug(f"📄 Contenido: {content[:200]}...")
+            logger.info(f"Contenido generado exitosamente ({len(content)} caracteres)")
+            logger.debug(f"Contenido: {content[:200]}...")
 
-            # Parsear el JSON
+            # Parsear el JSON (remover bloques de código markdown si existen)
             import json
+
+            # Limpiar bloques de código markdown
+            content_clean = content.strip()
+            if content_clean.startswith("```"):
+                # Remover ```json al inicio y ``` al final
+                content_clean = re.sub(r'^```(?:json)?\s*\n?', '', content_clean)
+                content_clean = re.sub(r'\n?```\s*$', '', content_clean)
+
+            # SOLUCIÓN ROBUSTA: Escapar saltos de línea dentro de strings JSON
+            # Esto convierte saltos literales en \n escapados
+            in_string = False
+            escape_next = False
+            result_chars = []
+
+            for i, char in enumerate(content_clean):
+                if escape_next:
+                    result_chars.append(char)
+                    escape_next = False
+                    continue
+
+                if char == '\\':
+                    escape_next = True
+                    result_chars.append(char)
+                    continue
+
+                if char == '"':
+                    in_string = not in_string
+                    result_chars.append(char)
+                    continue
+
+                # Si estamos dentro de un string y encontramos un salto de línea, escaparlo
+                if in_string and char == '\n':
+                    result_chars.append('\\n')
+                elif in_string and char == '\r':
+                    # Ignorar \r
+                    continue
+                elif in_string and char == '\t':
+                    result_chars.append('\\t')
+                else:
+                    result_chars.append(char)
+
+            content_clean = ''.join(result_chars)
+
             try:
-                result = json.loads(content)
+                result = json.loads(content_clean)
 
                 # Validar que tenga los campos necesarios
                 required_fields = ['title', 'content', 'excerpt']
                 if not all(field in result for field in required_fields):
-                    logger.error("❌ La respuesta no contiene todos los campos requeridos")
+                    logger.error("La respuesta no contiene todos los campos requeridos")
                     return None
 
                 # Asegurar que categories y tags existan
@@ -127,20 +169,20 @@ NO incluyas ningún texto adicional fuera del JSON. El contenido debe estar en f
                 if 'tags' not in result:
                     result['tags'] = []
 
-                logger.info(f"✅ Contenido parseado correctamente")
-                logger.info(f"📝 Título: {result['title']}")
-                logger.info(f"📊 Categorías: {result['categories']}")
-                logger.info(f"🏷️ Tags: {result['tags']}")
+                logger.info(f"Contenido parseado correctamente")
+                logger.info(f"Titulo: {result['title']}")
+                logger.info(f"Categorias: {result['categories']}")
+                logger.info(f"Tags: {result['tags']}")
 
                 return result
 
             except json.JSONDecodeError as e:
-                logger.error(f"❌ Error al parsear JSON de OpenRouter: {e}")
-                logger.error(f"📄 Respuesta recibida: {content[:500]}")
+                logger.error(f"Error al parsear JSON de Groq: {e}")
+                logger.error(f"Respuesta recibida: {content[:500]}")
                 return None
 
         except Exception as e:
-            logger.error(f"❌ Error generando contenido con OpenRouter: {e}")
+            logger.error(f"Error generando contenido con Groq: {e}")
             return None
 
     def generate_simple_content(
@@ -152,24 +194,22 @@ NO incluyas ningún texto adicional fuera del JSON. El contenido debe estar en f
         Genera contenido simple basado en un prompt
 
         Args:
-            prompt: Instrucción o pregunta para OpenRouter
+            prompt: Instrucción o pregunta para Groq
             max_tokens: Máximo de tokens a generar
 
         Returns:
-            Texto generado por OpenRouter
+            Texto generado por Groq
         """
         if not self.is_available():
-            logger.error("❌ Generador de IA no disponible")
+            logger.error("Generador de IA no disponible")
             return None
 
         try:
-            logger.info(f"🤖 Generando respuesta simple con OpenRouter...")
+            logger.info(f"Generando respuesta simple con Groq...")
 
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/JRafael2023/mcpwp",
-                "X-Title": "WordPress MCP Server"
+                "Content-Type": "application/json"
             }
 
             payload = {
@@ -189,12 +229,12 @@ NO incluyas ningún texto adicional fuera del JSON. El contenido debe estar en f
 
             response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"]
-            logger.info(f"✅ Respuesta generada: {len(content)} caracteres")
+            logger.info(f"Respuesta generada: {len(content)} caracteres")
 
             return content
 
         except Exception as e:
-            logger.error(f"❌ Error generando respuesta simple: {e}")
+            logger.error(f"Error generando respuesta simple: {e}")
             return None
 
     def improve_content(
@@ -203,7 +243,7 @@ NO incluyas ningún texto adicional fuera del JSON. El contenido debe estar en f
         improvements: str = "mejorar SEO, claridad y estructura"
     ) -> Optional[str]:
         """
-        Mejora contenido existente usando OpenRouter
+        Mejora contenido existente usando Groq
 
         Args:
             original_content: Contenido original a mejorar
@@ -213,7 +253,7 @@ NO incluyas ningún texto adicional fuera del JSON. El contenido debe estar en f
             Contenido mejorado
         """
         if not self.is_available():
-            logger.error("❌ Generador de IA no disponible")
+            logger.error("Generador de IA no disponible")
             return None
 
         try:
@@ -224,13 +264,11 @@ Contenido original:
 
 Devuelve el contenido mejorado en formato HTML válido, manteniendo la estructura pero optimizando el texto."""
 
-            logger.info(f"🤖 Mejorando contenido con OpenRouter...")
+            logger.info(f"Mejorando contenido con Groq...")
 
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/JRafael2023/mcpwp",
-                "X-Title": "WordPress MCP Server"
+                "Content-Type": "application/json"
             }
 
             payload = {
@@ -249,10 +287,10 @@ Devuelve el contenido mejorado en formato HTML válido, manteniendo la estructur
 
             response.raise_for_status()
             improved = response.json()["choices"][0]["message"]["content"]
-            logger.info(f"✅ Contenido mejorado exitosamente")
+            logger.info(f"Contenido mejorado exitosamente")
 
             return improved
 
         except Exception as e:
-            logger.error(f"❌ Error mejorando contenido: {e}")
+            logger.error(f"Error mejorando contenido: {e}")
             return None
